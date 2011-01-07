@@ -18,9 +18,6 @@
 A web server demonstrating the use of googlesafebrowsing.client.
 """
 
-from googlesafebrowsing import client
-from googlesafebrowsing import datastore
-
 import BaseHTTPServer
 import cgi
 import datetime
@@ -30,6 +27,12 @@ import SocketServer
 import sys
 import threading
 
+# Hack to set the import path to the root to the root of the SVN directory
+# so we can import from the python directory.
+sys.path[0] = '/'.join(sys.path[0].split('/')[:-1])
+
+from python import client
+from python import datastore
 
 class ListStats(object):
   """

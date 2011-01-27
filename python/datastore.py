@@ -45,7 +45,11 @@ class DataStore(object):
     if create:
       flags = 'c'
     try:
-      self._db = shelve.open(basefile, flag=flags, writeback=True)
+      # We must use protocol 2 because we are using __slots__ on classes that
+      # are pickled, and older protocol versions choke unless you overwrite
+      # __getstate__ and __setstate__ manually. This also writes out the data
+      # in a more compact binary representation.
+      self._db = shelve.open(basefile, flag=flags, writeback=True, protocol=2)
     except Exception, e:
       raise Error(e)
 
@@ -55,10 +59,13 @@ class DataStore(object):
 
   def Sync(self):
     """
-    This is very slow. Also, it will replace the objects in the database with
-    new copies so that existing references to the old objects will no longer
-    update the datastore. E.g., you must call GetLists() again after calling
-    this.
+    This is very slow.
+
+    TODO(gcasto): Possibly change __getstate__ and __setstate__ for list objects
+    to change how we pickle them. The current implementation is doing more work
+    than is necessary since the expressions are stored in multiple ways. Writing
+    out the hashes and chunk numbers explicity and then rebuilding the necessary
+    datastructures may be better.
     """
     self._db.sync()
 
@@ -68,6 +75,12 @@ class DataStore(object):
     objects in it are written back to the data store when Sync is called.
     """
     return self._db[DataStore.LISTS]
+
+  def SetLists(self, lists):
+    """
+    Sets the list field of the database object
+    """
+    self._db[DataStore.LISTS] = lists
 
   def GetWrKey(self):
     return self._db[DataStore.WRKEY]

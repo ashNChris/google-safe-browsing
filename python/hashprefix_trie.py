@@ -18,6 +18,20 @@
 
 import itertools
 
+class Node(object):
+  """Represents a node in the trie. Conceptually an inner class of
+  HashprefixTrie, but pickle doesn't support nested classes, so it lives
+  here.
+
+  Holds a list of values and a dict that maps char -> Node.
+  """
+  __slots__ = ('values', 'children', 'parent')
+
+  def __init__(self, parent=None):
+    self.values = []
+    self.children = {}  # Maps char -> Node
+    self.parent = parent
+
 class HashprefixTrie(object):
   """Trie that maps hash prefixes to a list of values."""
 
@@ -26,20 +40,8 @@ class HashprefixTrie(object):
   # shorter than this value.
   MIN_PREFIX_LEN = 4
 
-  class Node(object):
-    """Represents a node in the trie.
-
-    Holds a list of values and a dict that maps char -> Node.
-    """
-    __slots__ = ('values', 'children', 'parent')
-
-    def __init__(self, parent=None):
-      self.values = []
-      self.children = {}  # Maps char -> HashprefixTrie.Node
-      self.parent = parent
-
   def __init__(self):
-    self._root = HashprefixTrie.Node()
+    self._root = Node()
     self._size = 0  # Number of hash prefixes in the trie.
 
   def _GetPrefixComponents(self, hashprefix):
@@ -65,7 +67,7 @@ class HashprefixTrie(object):
       if char in node.children:
         node = node.children[char]
       elif create_if_necessary:
-        node = node.children.setdefault(char, HashprefixTrie.Node(node))
+        node = node.children.setdefault(char, Node(node))
       else:
         return None
     return node

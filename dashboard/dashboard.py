@@ -59,6 +59,13 @@ class DashboardServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
     self.sync_time = None
     self.sync_updates = None
     self.stats_lock = threading.RLock()
+
+    # Get stats for data already downloaded.
+    self.stats_lock.acquire()
+    for sbl in ds.GetLists().values():
+      self.lists_stats.append(ListStats(sbl))
+    self.stats_lock.release()
+
     self.sbc = client.Client(ds,
                              apikey=apikey,
                              use_mac=True,

@@ -264,6 +264,14 @@ class Client(object):
         requested_delay, updates_done = self._Update()
         logging.info('Finished update number %d, next delay: %d',
                      num_updates, requested_delay)
+
+        # Save current list info to disk.
+        try:
+          self._datastore.SetLists(self._sbls)
+          self._datastore.Sync()
+        except:
+          logging.exception("Datastore sync failed")
+
         if updates_done:
           logging.info('Fully in sync')
           self._force_delay = None
@@ -289,7 +297,6 @@ class Client(object):
           self._exit_cond.wait(delay)
         if self._exit_updater:
           logging.info('Exiting')
-          self._datastore.Sync()
           return
       finally:
         self._exit_cond.release()

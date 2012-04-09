@@ -63,7 +63,7 @@ response_data_by_step = {}
 # Dict of step -> Dict of hash_prefix ->
 # (full length hashes responses, num times requested)
 hash_data_by_step = {}
-client_key = ''
+client_key = None
 enforce_caching = False
 validate_database = True
 server_port = -1
@@ -89,14 +89,20 @@ def LoadData(filename):
   """ Load data from filename to be used by the testing server.
   """
   global response_data_by_step
+  global hash_data_by_step
   global client_key
   data_file = open(filename, 'rb')
   str_data = data_file.read()
   test_data = external_test_pb2.TestData()
   test_data.ParseFromString(str_data)
   print "Data Loaded"
-  client_key = test_data.ClientKey
+  if test_data.HasField('ClientKey'):
+    client_key = test_data.ClientKey
+  else:
+    client_key = None
   step = 0
+  response_data_by_step = {}
+  hash_data_by_step = {}
   for step_data in test_data.Steps:
     step += 1
     step_list = []
@@ -142,12 +148,15 @@ def VerifyTestComplete():
                (binascii.hexlify(prefix),
                 num_requests,
                 expression))
+        # This information is slightly redundant with what will be printed below
+        # but it is occasionally worth seeing.
+        print "Response %s" % response
         cur_index = 0
         while cur_index < len(response):
           end_header_index = response.find('\n', cur_index + 1)
           header = response[cur_index:end_header_index]
           (listname, chunk_num, hashdatalen) = header.split(":")
-          print "   List '%s' in add chunk num %d" % (listname, chunk_num)
+          print "   List '%s' in add chunk num %s" % (listname, chunk_num)
           cur_index = end_header_index + hashdatalen + 1
 
         complete = False
@@ -173,8 +182,11 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
   def MACResponse(self, response, is_downloads_request):
     """ Returns the response wrapped with a MAC. Formatting will change
-    if this is a downloads_request or hashserver_request.
+    if this is a downloads_request or hashserver_request.  If no client_key
+    is set, returns the response as-is.
     """
+    if client_key is None:
+      return response
     unescaped_mac = hmac.new(client_key, response, sha).digest()
     return "%s%s\n%s" % (is_downloads_request and "m:" or "",
                        base64.urlsafe_b64encode(unescaped_mac),
@@ -317,7 +329,8 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                                'localhost:%d' % server_port,
                                server_response)
       # Remove the current MAC, because it's going to be wrong now.
-      server_response = server_response[server_response.find('\n')+1:]
+      if server_response.startswith('m:'):
+        server_response = server_response[server_response.find('\n')+1:]
       # Add a new correct MAC.
       server_response = self.MACResponse(server_response, True)
 
@@ -390,3 +403,9 @@ if __name__ == '__main__':
     tm.start()
 
   server.serve_forever()
+  try:
+    server.serve_forever()
+  except KeyboardInterrupt:
+    pass
+  server.server_close()
+  print "Server stopped."

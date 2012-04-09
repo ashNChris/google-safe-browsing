@@ -161,7 +161,7 @@ _TESTDATA = descriptor.Descriptor(
       options=None),
     descriptor.FieldDescriptor(
       name='ClientKey', full_name='TestData.ClientKey', index=1,
-      number=2, type=12, cpp_type=9, label=2,
+      number=2, type=12, cpp_type=9, label=1,
       default_value="",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,

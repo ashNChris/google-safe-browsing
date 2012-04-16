@@ -66,7 +66,6 @@ hash_data_by_step = {}
 client_key = None
 enforce_caching = False
 validate_database = True
-server_port = -1
 datafile_location = ''
 
 def EndServer():
@@ -85,13 +84,13 @@ def SortedTupleFromParamsAndPostData(params,
     params.append((POST_DATA_KEY, tuple(sorted(post_data.split('\n')))))
   return tuple(sorted(params))
 
-def LoadData(filename):
-  """ Load data from filename to be used by the testing server.
+def LoadData():
+  """ Load data from datafile_location to be used by the testing server.
   """
   global response_data_by_step
   global hash_data_by_step
   global client_key
-  data_file = open(filename, 'rb')
+  data_file = open(datafile_location, 'rb')
   str_data = data_file.read()
   test_data = external_test_pb2.TestData()
   test_data.ParseFromString(str_data)
@@ -157,7 +156,7 @@ def VerifyTestComplete():
           header = response[cur_index:end_header_index]
           (listname, chunk_num, hashdatalen) = header.split(":")
           print "   List '%s' in add chunk num %s" % (listname, chunk_num)
-          cur_index = end_header_index + hashdatalen + 1
+          cur_index = end_header_index + int(hashdatalen) + 1
 
         complete = False
 
@@ -219,7 +218,7 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     elif path == GETHASH_PATH:
       self.SynthesizeGethashResponse(step)
     elif path == RESET_PATH:
-      LoadData(datafile_location)
+      LoadData()
       self.send_response(200)
       self.end_headers()
       self.wfile.write('done')
@@ -326,7 +325,8 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     if path == DOWNLOADS_PATH:
       # Need to have the redirects point to the current port.
       server_response = re.sub(r'localhost:\d+',
-                               'localhost:%d' % server_port,
+                               '%s:%d' % (self.server.server_name,
+                                          self.server.server_port),
                                server_response)
       # Remove the current MAC, because it's going to be wrong now.
       if server_response.startswith('m:'):
@@ -345,7 +345,8 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     self.VerifyRequest(True)
 
 
-def SetupServer(datafile_location,
+def SetupServer(opt_datafile_location,
+                host,
                 port,
                 opt_enforce_caching,
                 opt_validate_database):
@@ -361,21 +362,23 @@ def SetupServer(datafile_location,
   Returns:
     An HTTPServer object which the caller should call serve_forever() on.
   """
-  LoadData(datafile_location)
+  global datafile_location
+  datafile_location = opt_datafile_location
+  LoadData()
   # TODO(gcasto):  Look into extending HTTPServer to remove global variables.
   global enforce_caching
   global validate_database
-  global server_port
   enforce_caching = opt_enforce_caching
   validate_database = opt_validate_database
-  server_port = port
-  return BaseHTTPServer.HTTPServer(('', port), RequestHandler)
+  return BaseHTTPServer.HTTPServer((host, port), RequestHandler)
 
 if __name__ == '__main__':
   parser = OptionParser()
   parser.add_option("--datafile", dest="datafile_location",
                     default=DEFAULT_DATAFILE_LOCATION,
                     help="Location to load testing data from.")
+  parser.add_option("--host", dest="host",
+                    default='localhost', help="Host the server should bind.")
   parser.add_option("--port", dest="port", type="int",
                     default=DEFAULT_PORT, help="Port to run the server on.")
   parser.add_option("--enforce_caching", dest="enforce_caching",
@@ -392,8 +395,8 @@ if __name__ == '__main__':
                     "down. If <=0, the server will never be down")
   (options, _) = parser.parse_args()
 
-  datafile_location = options.datafile_location
   server = SetupServer(options.datafile_location,
+                       options.host,
                        options.port,
                        options.enforce_caching,
                        options.validate_database)
@@ -402,7 +405,6 @@ if __name__ == '__main__':
     tm = Timer(options.server_timeout_sec, EndServer)
     tm.start()
 
-  server.serve_forever()
   try:
     server.serve_forever()
   except KeyboardInterrupt:

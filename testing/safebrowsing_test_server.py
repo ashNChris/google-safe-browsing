@@ -325,7 +325,7 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     if path == DOWNLOADS_PATH:
       # Need to have the redirects point to the current port.
       server_response = re.sub(r'localhost:\d+',
-                               '%s:%d' % (self.server.server_name,
+                               '%s:%d' % (self.server.server_address[0],
                                           self.server.server_port),
                                server_response)
       # Remove the current MAC, because it's going to be wrong now.

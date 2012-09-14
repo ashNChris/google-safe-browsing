@@ -295,6 +295,8 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       del params["client"]
     if "appver" in params:
       del params["appver"]
+    if "key" in params:
+      del params["key"]
 
     param_key = self.MakeParamKey(
         params,
